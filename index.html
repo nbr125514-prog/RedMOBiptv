@@ -11,14 +11,14 @@
         header { background: #000; padding: 15px; text-align: center; border-bottom: 2px solid var(--red); font-size: 24px; font-weight: bold; }
         header span { color: var(--red); }
         .container { padding: 15px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-        input { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 15px; border-radius: 5px; margin-bottom: 10px; outline: none; }
-        button { background: var(--red); color: #fff; border: none; padding: 15px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+        input { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 15px; border-radius: 5px; margin-bottom: 10px; outline: none; width: 100%; box-sizing: border-box; }
+        button { background: var(--red); color: #fff; border: none; padding: 15px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 10px; width: 100%; }
         #video-container { width: 100%; background: #000; aspect-ratio: 16/9; position: sticky; top: 0; z-index: 100; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
         video { width: 100%; height: 100%; }
         .chan-item { background: var(--card); display: flex; align-items: center; padding: 10px; margin-bottom: 5px; border-radius: 5px; cursor: pointer; border: 1px solid #222; }
         .chan-item img { width: 45px; height: 45px; margin-right: 15px; object-fit: contain; background: #000; border-radius: 3px; }
         .hidden { display: none; }
-        #status { color: var(--red); text-align: center; font-size: 12px; margin-bottom: 10px; }
+        #status { color: var(--red); text-align: center; font-size: 14px; margin-bottom: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -32,9 +32,8 @@
 <div class="container">
     <div id="setup-screen">
         <input type="text" id="m3uUrl" placeholder="Cole sua lista M3U8 aqui...">
-        <div id="status"></div>
-        <button onclick="loadIPTV()">CARREGAR LISTA</button>
-        <p style="font-size: 11px; color: #888; text-align: center;">Dica: Se a lista não carregar, tente abrir este site no navegador KIWI BROWSER com a extensão "Allow CORS" ativada.</p>
+        <div id="status">Certifique-se que o Allow-CORS está ON</div>
+        <button onclick="loadIPTV()">CARREGAR LISTA DIRETA</button>
     </div>
 
     <div id="player-screen" class="hidden">
@@ -51,25 +50,24 @@
         const url = document.getElementById('m3uUrl').value;
         if(!url) return alert("Insira o link da lista!");
         
-        document.getElementById('status').innerText = "Tentando conexão segura... aguarde.";
-        
-        // Tentamos usar o proxy AllOrigins que é mais estável para textos longos
-        const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+        document.getElementById('status').innerText = "Carregando diretamente via Extensão...";
 
         try {
-            const response = await fetch(proxy);
-            const json = await response.json();
-            const data = json.contents;
+            // BUSCA DIRETA (A Extensão Allow-CORS cuidará do resto)
+            const response = await fetch(url);
+            const data = await response.text();
             
-            if(!data || data.length < 10) throw new Error();
+            if(!data.includes("#EXTM3U")) {
+                throw new Error("Não é uma lista válida");
+            }
             
             parseM3U(data);
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('video-container').classList.remove('hidden');
             document.getElementById('player-screen').classList.remove('hidden');
         } catch (err) {
-            document.getElementById('status').innerText = "Erro de conexão. O servidor da lista bloqueou o acesso.";
-            alert("O servidor da sua lista bloqueou o acesso pelo navegador (CORS). No Android, use o Kiwi Browser com a extensão Allow-CORS para burlar isso.");
+            document.getElementById('status').innerText = "ERRO: A extensão está desligada ou o link é inválido.";
+            console.error(err);
         }
     }
 
@@ -82,8 +80,8 @@
             let line = lines[i].trim();
             if (line.startsWith('#EXTINF:')) {
                 const name = line.split(',').pop();
-                const logo = line.match(/tvg-logo="(.*?)"/);
-                current = { name, logo: logo ? logo[1] : '' };
+                const logoMatch = line.match(/tvg-logo="(.*?)"/);
+                current = { name, logo: logoMatch ? logoMatch[1] : '' };
             } else if (line.startsWith('http')) {
                 if (current) {
                     current.url = line;
@@ -108,13 +106,11 @@
     }
 
     function playStream(url) {
-        // Se a lista for HTTP e o site HTTPS, o navegador vai tentar bloquear.
-        // Tentamos forçar o play
         if (Hls.isSupported()) {
             const hls = new Hls();
             hls.loadSource(url);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => alert("Erro ao reproduzir. Este link pode exigir conexão HTTP pura.")));
+            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
         } else {
             video.src = url;
             video.play();
