@@ -6,84 +6,92 @@
     <title>RedMOBiptv - Oficial</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        :root { --red: #ff0000; --bg: #0a0a0a; --card: #161616; --txt: #ffffff; }
-        body { background: var(--bg); color: var(--txt); font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        header { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 2px solid var(--red); font-weight: bold; font-size: 22px; }
+        :root { --red: #ff0000; --bg: #050505; --card: #121212; --txt: #ffffff; }
+        body { background: var(--bg); color: var(--txt); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #000; padding: 15px; text-align: center; border-bottom: 2px solid var(--red); font-size: 24px; font-weight: bold; }
         header span { color: var(--red); }
-        .setup { padding: 20px; display: flex; flex-direction: column; gap: 10px; }
-        input { background: #222; border: 1px solid #444; color: #fff; padding: 15px; border-radius: 8px; }
-        button { background: var(--red); color: #fff; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        #video-container { width: 100%; background: #000; aspect-ratio: 16/9; }
+        .container { padding: 15px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+        input { background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 15px; border-radius: 5px; margin-bottom: 10px; outline: none; }
+        button { background: var(--red); color: #fff; border: none; padding: 15px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+        #video-container { width: 100%; background: #000; aspect-ratio: 16/9; position: sticky; top: 0; z-index: 100; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
         video { width: 100%; height: 100%; }
-        .list { flex: 1; overflow-y: auto; padding: 10px; }
-        .item { background: var(--card); display: flex; align-items: center; padding: 10px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; }
-        .item img { width: 40px; height: 40px; margin-right: 15px; object-fit: contain; }
+        .chan-item { background: var(--card); display: flex; align-items: center; padding: 10px; margin-bottom: 5px; border-radius: 5px; cursor: pointer; border: 1px solid #222; }
+        .chan-item img { width: 45px; height: 45px; margin-right: 15px; object-fit: contain; background: #000; border-radius: 3px; }
         .hidden { display: none; }
-        .loading { text-align: center; color: var(--red); padding: 20px; }
+        #status { color: var(--red); text-align: center; font-size: 12px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-<header>RedMOB<span>iptv</span></header>
-
-<div id="login-screen" class="setup">
-    <input type="text" id="m3uUrl" placeholder="Cole aqui seu link M3U8...">
-    <button onclick="fetchList()">CARREGAR CANAIS</button>
-    <p style="font-size: 10px; color: #666; text-align: center;">Nota: Usamos uma ponte CORS para liberar sua lista.</p>
+<div id="video-container" class="hidden">
+    <video id="video" controls playsinline></video>
 </div>
 
-<div id="player-screen" class="hidden">
-    <div id="video-container">
-        <video id="video" controls playsinline></video>
+<header>RedMOB<span>iptv</span></header>
+
+<div class="container">
+    <div id="setup-screen">
+        <input type="text" id="m3uUrl" placeholder="Cole sua lista M3U8 aqui...">
+        <div id="status"></div>
+        <button onclick="loadIPTV()">CARREGAR LISTA</button>
+        <p style="font-size: 11px; color: #888; text-align: center;">Dica: Se a lista não carregar, tente abrir este site no navegador KIWI BROWSER com a extensão "Allow CORS" ativada.</p>
     </div>
-    <div style="padding: 10px;">
-        <input type="text" id="search" placeholder="🔍 Buscar canal..." onkeyup="filter()" style="width:100%; padding: 10px; box-sizing: border-box;">
+
+    <div id="player-screen" class="hidden">
+        <input type="text" id="search" placeholder="🔍 Buscar canal..." onkeyup="filter()">
+        <div id="channelList"></div>
     </div>
-    <div class="list" id="channelList"></div>
 </div>
 
 <script>
     const video = document.getElementById('video');
     let allChannels = [];
 
-    async function fetchList() {
-        const rawUrl = document.getElementById('m3uUrl').value;
-        if(!rawUrl) return alert("Insira a URL!");
-
-        // ESTA É A SOLUÇÃO PARA O CORS:
-        // Usamos o proxy corsproxy.io para "enganar" o bloqueio do servidor
-        const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(rawUrl);
-
-        document.getElementById('login-screen').innerHTML = '<div class="loading">Iniciando Ponte Segura... aguarde.</div>';
+    async function loadIPTV() {
+        const url = document.getElementById('m3uUrl').value;
+        if(!url) return alert("Insira o link da lista!");
+        
+        document.getElementById('status').innerText = "Tentando conexão segura... aguarde.";
+        
+        // Tentamos usar o proxy AllOrigins que é mais estável para textos longos
+        const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
 
         try {
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error('Erro na rede');
-            const data = await response.text();
-            parse(data);
-            document.getElementById('login-screen').classList.add('hidden');
+            const response = await fetch(proxy);
+            const json = await response.json();
+            const data = json.contents;
+            
+            if(!data || data.length < 10) throw new Error();
+            
+            parseM3U(data);
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('video-container').classList.remove('hidden');
             document.getElementById('player-screen').classList.remove('hidden');
         } catch (err) {
-            alert("Erro de CORS ou Link Inválido. Tente novamente.");
-            location.reload();
+            document.getElementById('status').innerText = "Erro de conexão. O servidor da lista bloqueou o acesso.";
+            alert("O servidor da sua lista bloqueou o acesso pelo navegador (CORS). No Android, use o Kiwi Browser com a extensão Allow-CORS para burlar isso.");
         }
     }
 
-    function parse(data) {
+    function parseM3U(data) {
         const lines = data.split('\n');
         let current = null;
-        lines.forEach(line => {
-            line = line.trim();
+        allChannels = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
             if (line.startsWith('#EXTINF:')) {
                 const name = line.split(',').pop();
                 const logo = line.match(/tvg-logo="(.*?)"/);
                 current = { name, logo: logo ? logo[1] : '' };
-            } else if (line.startsWith('http') && current) {
-                current.url = line;
-                allChannels.push(current);
-                current = null;
+            } else if (line.startsWith('http')) {
+                if (current) {
+                    current.url = line;
+                    allChannels.push(current);
+                    current = null;
+                }
             }
-        });
+        }
         render(allChannels);
     }
 
@@ -92,32 +100,31 @@
         container.innerHTML = "";
         list.forEach(c => {
             const d = document.createElement('div');
-            d.className = 'item';
-            d.onclick = () => play(c.url);
-            d.innerHTML = `<img src="${c.logo || 'https://via.placeholder.com/40'}"> <span>${c.name}</span>`;
+            d.className = 'chan-item';
+            d.onclick = () => playStream(c.url);
+            d.innerHTML = `<img src="${c.logo || 'https://via.placeholder.com/45/000/fff?text=TV'}"> <span>${c.name}</span>`;
             container.appendChild(d);
         });
     }
 
-    function play(url) {
-        // Para o vídeo também passar pelo proxy se necessário
-        const finalUrl = "https://corsproxy.io/?" + encodeURIComponent(url);
-        
+    function playStream(url) {
+        // Se a lista for HTTP e o site HTTPS, o navegador vai tentar bloquear.
+        // Tentamos forçar o play
         if (Hls.isSupported()) {
             const hls = new Hls();
-            hls.loadSource(finalUrl);
+            hls.loadSource(url);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => alert("Erro ao reproduzir. Este link pode exigir conexão HTTP pura.")));
         } else {
-            video.src = finalUrl;
+            video.src = url;
             video.play();
         }
         window.scrollTo(0,0);
     }
 
     function filter() {
-        const query = document.getElementById('search').value.toLowerCase();
-        render(allChannels.filter(c => c.name.toLowerCase().includes(query)));
+        const q = document.getElementById('search').value.toLowerCase();
+        render(allChannels.filter(c => c.name.toLowerCase().includes(q)));
     }
 </script>
 </body>
