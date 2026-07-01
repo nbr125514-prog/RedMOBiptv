@@ -3,257 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RedMOBiptv - Player Oficial</title>
-    <!-- Biblioteca de Vídeo Profissional -->
+    <title>RedMOBiptv - Oficial</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        :root {
-            --cor-principal: #ff0000; /* Vermelho RedMOB */
-            --cor-fundo: #0a0a0a;
-            --cor-card: #161616;
-            --cor-texto: #ffffff;
-        }
-
-        body {
-            background-color: var(--cor-fundo);
-            color: var(--cor-texto);
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        /* Topo */
-        header {
-            background: linear-gradient(180deg, #1f1f1f 0%, #0a0a0a 100%);
-            padding: 15px;
-            text-align: center;
-            border-bottom: 2px solid var(--cor-principal);
-            font-weight: bold;
-            font-size: 22px;
-            letter-spacing: 1px;
-        }
-
-        header span { color: var(--cor-principal); }
-
-        /* Área de Configuração */
-        .config-area {
-            background: var(--cor-card);
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        input[type="text"] {
-            background: #252525;
-            border: 1px solid #333;
-            color: white;
-            padding: 12px;
-            border-radius: 8px;
-            outline: none;
-            font-size: 14px;
-        }
-
-        button {
-            background: var(--cor-principal);
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: bold;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        button:active { transform: scale(0.95); }
-
-        /* Player de Vídeo */
-        #video-wrapper {
-            width: 100%;
-            background: #000;
-            aspect-ratio: 16 / 9;
-            position: relative;
-        }
-
-        video {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        /* Lista de Canais */
-        #search-box {
-            padding: 10px;
-            background: var(--cor-fundo);
-        }
-
-        .channel-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-        }
-
-        .channel-item {
-            background: var(--cor-card);
-            display: flex;
-            align-items: center;
-            padding: 10px;
-            margin-bottom: 8px;
-            border-radius: 10px;
-            border-left: 4px solid transparent;
-            transition: 0.2s;
-        }
-
-        .channel-item:active {
-            background: #333;
-            border-left-color: var(--cor-principal);
-        }
-
-        .channel-item img {
-            width: 45px;
-            height: 45px;
-            object-fit: contain;
-            border-radius: 5px;
-            margin-right: 15px;
-            background: #000;
-        }
-
-        .channel-name {
-            font-size: 15px;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* Esconder scrollbar no mobile */
-        .channel-list::-webkit-scrollbar { width: 4px; }
-        .channel-list::-webkit-scrollbar-thumb { background: var(--cor-principal); }
-
+        :root { --red: #ff0000; --bg: #0a0a0a; --card: #161616; --txt: #ffffff; }
+        body { background: var(--bg); color: var(--txt); font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        header { background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 2px solid var(--red); font-weight: bold; font-size: 22px; }
+        header span { color: var(--red); }
+        .setup { padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+        input { background: #222; border: 1px solid #444; color: #fff; padding: 15px; border-radius: 8px; }
+        button { background: var(--red); color: #fff; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        #video-container { width: 100%; background: #000; aspect-ratio: 16/9; }
+        video { width: 100%; height: 100%; }
+        .list { flex: 1; overflow-y: auto; padding: 10px; }
+        .item { background: var(--card); display: flex; align-items: center; padding: 10px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; }
+        .item img { width: 40px; height: 40px; margin-right: 15px; object-fit: contain; }
         .hidden { display: none; }
+        .loading { text-align: center; color: var(--red); padding: 20px; }
     </style>
 </head>
 <body>
 
 <header>RedMOB<span>iptv</span></header>
 
-<div class="config-area" id="setup">
-    <input type="text" id="urlInput" placeholder="Cole sua lista .m3u8 aqui...">
-    <button onclick="carregarLista()">Entrar no Sistema</button>
+<div id="login-screen" class="setup">
+    <input type="text" id="m3uUrl" placeholder="Cole aqui seu link M3U8...">
+    <button onclick="fetchList()">CARREGAR CANAIS</button>
+    <p style="font-size: 10px; color: #666; text-align: center;">Nota: Usamos uma ponte CORS para liberar sua lista.</p>
 </div>
 
-<div id="player-main" class="hidden">
-    <div id="video-wrapper">
+<div id="player-screen" class="hidden">
+    <div id="video-container">
         <video id="video" controls playsinline></video>
     </div>
-
-    <div id="search-box">
-        <input type="text" id="searchBar" placeholder="🔍 Buscar canal..." onkeyup="filtrarCanais()" style="width: 100%; box-sizing: border-box;">
+    <div style="padding: 10px;">
+        <input type="text" id="search" placeholder="🔍 Buscar canal..." onkeyup="filter()" style="width:100%; padding: 10px; box-sizing: border-box;">
     </div>
-
-    <div class="channel-list" id="listaCanais">
-        <!-- Canais aparecem aqui -->
-    </div>
+    <div class="list" id="channelList"></div>
 </div>
 
 <script>
     const video = document.getElementById('video');
-    const setup = document.getElementById('setup');
-    const playerMain = document.getElementById('player-main');
-    const listaCanais = document.getElementById('listaCanais');
-    let dadosCanais = [];
+    let allChannels = [];
 
-    // Tenta carregar lista salva anteriormente
-    window.onload = () => {
-        const salva = localStorage.getItem('redmob_url');
-        if(salva) {
-            document.getElementById('urlInput').value = salva;
-        }
-    };
+    async function fetchList() {
+        const rawUrl = document.getElementById('m3uUrl').value;
+        if(!rawUrl) return alert("Insira a URL!");
 
-    async function carregarLista() {
-        const url = document.getElementById('urlInput').value;
-        if (!url) return alert("Por favor, cole o link da sua lista!");
+        // ESTA É A SOLUÇÃO PARA O CORS:
+        // Usamos o proxy corsproxy.io para "enganar" o bloqueio do servidor
+        const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(rawUrl);
 
-        localStorage.setItem('redmob_url', url);
-        listaCanais.innerHTML = "<p style='text-align:center'>Processando canais...</p>";
+        document.getElementById('login-screen').innerHTML = '<div class="loading">Iniciando Ponte Segura... aguarde.</div>';
 
         try {
-            const proxy = ""; // Pode adicionar um CORS proxy aqui se necessário
-            const response = await fetch(proxy + url);
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error('Erro na rede');
             const data = await response.text();
-            
-            parsearM3U(data);
-            setup.classList.add('hidden');
-            playerMain.classList.remove('hidden');
-        } catch (error) {
-            alert("Erro ao carregar lista. Verifique a URL ou o acesso CORS.");
+            parse(data);
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('player-screen').classList.remove('hidden');
+        } catch (err) {
+            alert("Erro de CORS ou Link Inválido. Tente novamente.");
+            location.reload();
         }
     }
 
-    function parsearM3U(data) {
-        const linhas = data.split('\n');
-        dadosCanais = [];
-        let itemAtual = null;
-
-        linhas.forEach(linha => {
-            linha = linha.trim();
-            if (linha.startsWith('#EXTINF:')) {
-                const info = linha;
-                const nome = info.split(',').pop();
-                const logoMatch = info.match(/tvg-logo="(.*?)"/);
-                itemAtual = {
-                    name: nome,
-                    logo: logoMatch ? logoMatch[1] : 'https://via.placeholder.com/50/000/fff?text=TV'
-                };
-            } else if (linha.startsWith('http') && itemAtual) {
-                itemAtual.url = linha;
-                dadosCanais.push(itemAtual);
-                itemAtual = null;
+    function parse(data) {
+        const lines = data.split('\n');
+        let current = null;
+        lines.forEach(line => {
+            line = line.trim();
+            if (line.startsWith('#EXTINF:')) {
+                const name = line.split(',').pop();
+                const logo = line.match(/tvg-logo="(.*?)"/);
+                current = { name, logo: logo ? logo[1] : '' };
+            } else if (line.startsWith('http') && current) {
+                current.url = line;
+                allChannels.push(current);
+                current = null;
             }
         });
-
-        renderizarCanais(dadosCanais);
+        render(allChannels);
     }
 
-    function renderizarCanais(lista) {
-        listaCanais.innerHTML = "";
-        lista.forEach(canal => {
-            const div = document.createElement('div');
-            div.className = 'channel-item';
-            div.onclick = () => playCanal(canal.url);
-            div.innerHTML = `
-                <img src="${canal.logo}" onerror="this.src='https://via.placeholder.com/50/000/fff?text=TV'">
-                <div class="channel-name">${canal.name}</div>
-            `;
-            listaCanais.appendChild(div);
+    function render(list) {
+        const container = document.getElementById('channelList');
+        container.innerHTML = "";
+        list.forEach(c => {
+            const d = document.createElement('div');
+            d.className = 'item';
+            d.onclick = () => play(c.url);
+            d.innerHTML = `<img src="${c.logo || 'https://via.placeholder.com/40'}"> <span>${c.name}</span>`;
+            container.appendChild(d);
         });
     }
 
-    function playCanal(url) {
+    function play(url) {
+        // Para o vídeo também passar pelo proxy se necessário
+        const finalUrl = "https://corsproxy.io/?" + encodeURIComponent(url);
+        
         if (Hls.isSupported()) {
             const hls = new Hls();
-            hls.loadSource(url);
+            hls.loadSource(finalUrl);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = url;
+        } else {
+            video.src = finalUrl;
             video.play();
         }
-        window.scrollTo({top: 0, behavior: 'smooth'});
+        window.scrollTo(0,0);
     }
 
-    function filtrarCanais() {
-        const termo = document.getElementById('searchBar').value.toLowerCase();
-        const filtrados = dadosCanais.filter(c => c.name.toLowerCase().includes(termo));
-        renderizarCanais(filtrados);
+    function filter() {
+        const query = document.getElementById('search').value.toLowerCase();
+        render(allChannels.filter(c => c.name.toLowerCase().includes(query)));
     }
 </script>
-
 </body>
 </html>
